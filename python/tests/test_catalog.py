@@ -3,10 +3,17 @@
 These describe the *intended* behavior. Fix the source in catalog/catalog.py until they
 all pass — do not change the tests.
 
-There are 6 planted bugs: 4 are easy to spot from a single failing test, and 2 are subtler
-(they only bite on an edge case). Each assertion carries a message describing the intended
-behavior, so a failure tells you what the method should do — not just how two values
-differ.
+There are 6 planted bugs. None of them announce themselves with a crash or an obviously
+absurd value — every one is a plausible-looking implementation that quietly disagrees with
+the docstring. The library distinguishes two counts: `copies_total` (how many the library
+OWNS) and `copies_available` (how many are ON THE SHELF right now). Several bugs hinge on
+that distinction. Read the docstring, then the code, and find the mismatch. Two waves:
+
+  * Wave 1 — a careful read of the docstring is enough to spot the mismatch.
+  * Wave 2 — the bug only bites on an edge case (a partially-borrowed book, the last copy,
+    or one return too many).
+
+Each assertion carries a message describing the intended behavior.
 """
 
 import pytest
@@ -15,50 +22,47 @@ from catalog import Catalog
 
 
 # ---------------------------------------------------------------------------
-# The 4 easier bugs
+# Wave 1 — read the docstring carefully
 # ---------------------------------------------------------------------------
 
-def test_is_available_true_with_one_copy():
-    # A book with a single copy on the shelf is available.
-    cat = Catalog()
-    book = cat.add_book("Dune", "Herbert", copies=1)
-    assert cat.is_available(book.id) is True, (
-        "is_available should be True whenever at least ONE copy is on the shelf; a book "
-        "with exactly 1 copy is available"
-    )
-
-
-def test_available_books_lists_in_stock():
-    # available_books returns books that HAVE copies on the shelf, not the sold-out ones.
+def test_is_available_reflects_copies_on_the_shelf():
+    # is_available is about what's ON THE SHELF (copies_available), not what the library
+    # OWNS (copies_total). A book with a copy on the shelf is available; a book with every
+    # copy checked out is NOT — even though the library still owns copies.
     cat = Catalog()
     stocked = cat.add_book("Dune", "Herbert", copies=2)
-    cat.add_book("Rare Tome", "Anon", copies=0)
-    titles = [b.title for b in cat.available_books()]
-    assert titles == ["Dune"], (
-        "available_books() should return books WITH copies available ('Dune'), not the "
-        "out-of-stock ones"
+    out = cat.add_book("Rare Tome", "Anon", copies=2)
+    out.copies_available = 0   # both copies are checked out; the library still owns 2
+    assert cat.is_available(stocked.id) is True, (
+        "is_available should be True when at least one copy is on the shelf"
+    )
+    assert cat.is_available(out.id) is False, (
+        "is_available should be False when copies_available is 0, even though the library "
+        "still OWNS copies (copies_total is 2)"
     )
 
 
-def test_books_by_author_matches_author():
-    # books_by_author returns the books written BY that author.
+def test_books_by_author_matches_exactly():
+    # books_by_author matches the author EXACTLY, not as a substring. 'Frank Herbertson'
+    # merely contains the letters of 'Herbert' and must not be returned for author 'Herbert'.
     cat = Catalog()
     cat.add_book("Dune", "Herbert")
-    cat.add_book("Foundation", "Asimov")
-    titles = [b.title for b in cat.books_by_author("Herbert")]
+    cat.add_book("Ringworld", "Larry Niven")
+    cat.add_book("A Guide", "Frank Herbertson")   # contains "Herbert" but is a different author
+    titles = sorted(b.title for b in cat.books_by_author("Herbert"))
     assert titles == ["Dune"], (
-        "books_by_author('Herbert') should return Herbert's books ('Dune'), not everyone "
-        "else's"
+        "books_by_author('Herbert') should match the author EXACTLY (just 'Dune'); "
+        "'Frank Herbertson' only contains the substring and must be excluded"
     )
 
 
 def test_total_copies_counts_owned():
-    # total_copies counts how many copies the library OWNS, independent of how many are
-    # currently checked out.
+    # total_copies counts how many copies the library OWNS (copies_total), independent of how
+    # many are currently checked out.
     cat = Catalog()
     a = cat.add_book("Dune", "Herbert", copies=3)
     cat.add_book("Foundation", "Asimov", copies=2)
-    cat.checkout(a.id)  # one copy of Dune is now out, but the library still OWNS 3
+    a.copies_available = 2   # one copy of Dune is out, but the library still OWNS 3
     assert cat.total_copies() == 5, (
         "total_copies() should sum copies_total (3 + 2 = 5); checking a copy out doesn't "
         "reduce how many the library owns"
@@ -66,8 +70,25 @@ def test_total_copies_counts_owned():
 
 
 # ---------------------------------------------------------------------------
-# The 2 harder bugs (edge cases)
+# Wave 2 — edge cases: partial stock, the last copy, one return too many
 # ---------------------------------------------------------------------------
+
+def test_available_books_includes_partially_borrowed():
+    # available_books returns every book with at least one copy on the shelf — INCLUDING a
+    # book that has some copies out and some still available. Only a fully checked-out book
+    # is excluded.
+    cat = Catalog()
+    full = cat.add_book("Dune", "Herbert", copies=2)          # 2 of 2 on the shelf
+    partial = cat.add_book("Foundation", "Asimov", copies=2)  # will be 1 of 2 on the shelf
+    partial.copies_available = 1
+    out = cat.add_book("Rare Tome", "Anon", copies=1)         # 0 of 1 on the shelf
+    out.copies_available = 0
+    titles = sorted(b.title for b in cat.available_books())
+    assert titles == ["Dune", "Foundation"], (
+        "available_books() should list every book with >= 1 copy on the shelf, including the "
+        "partially-borrowed 'Foundation'; only the fully checked-out 'Rare Tome' is excluded"
+    )
+
 
 def test_checkout_refuses_when_none_available():
     # Once every copy is checked out, a further checkout must fail and NOT drive the
@@ -99,7 +120,7 @@ def test_return_does_not_exceed_owned_copies():
 
 
 # ---------------------------------------------------------------------------
-# Correct behavior (kept as clean reference points)
+# Correct behavior (these pass out of the box — clean reference points)
 # ---------------------------------------------------------------------------
 
 def test_add_book_assigns_incrementing_ids():

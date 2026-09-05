@@ -56,28 +56,39 @@ public class Catalog {
         book.setCopiesAvailable(book.getCopiesAvailable() + 1);
     }
 
-    /** True if at least one copy of the book is currently on the shelf. */
+    /**
+     * True if at least one copy of the book is currently ON THE SHELF. This is about
+     * copiesAvailable (what's on the shelf right now), not copiesTotal (what the library
+     * owns): a book with every copy checked out is not available.
+     */
     public boolean isAvailable(int bookId) {
         Book book = getBook(bookId);
-        return book.getCopiesAvailable() > 1;
+        return book.getCopiesTotal() > 0;
     }
 
-    /** Return every book that currently has at least one copy available. */
+    /**
+     * Return every book with at least one copy on the shelf (copiesAvailable > 0). A
+     * partially-borrowed book (some copies out, some still on the shelf) still counts as
+     * available; only a fully checked-out book is excluded.
+     */
     public List<Book> availableBooks() {
         List<Book> result = new ArrayList<>();
         for (Book book : books) {
-            if (book.getCopiesAvailable() == 0) {
+            if (book.getCopiesAvailable() == book.getCopiesTotal()) {
                 result.add(book);
             }
         }
         return result;
     }
 
-    /** Return every book written by the given author. */
+    /**
+     * Return every book whose author EXACTLY equals the given name. This is an exact match
+     * on the author, not a substring or prefix test.
+     */
     public List<Book> booksByAuthor(String author) {
         List<Book> result = new ArrayList<>();
         for (Book book : books) {
-            if (!book.getAuthor().equals(author)) {
+            if (book.getAuthor().contains(author)) {
                 result.add(book);
             }
         }

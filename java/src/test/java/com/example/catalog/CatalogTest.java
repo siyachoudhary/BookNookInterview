@@ -13,60 +13,92 @@ import org.junit.jupiter.api.Test;
  * Behavioral tests for BookNook. These describe the *intended* behavior.
  * Fix the source in Catalog.java until they all pass — do not change the tests.
  *
- * There are 6 planted bugs: 4 easy to spot from a single failing test, and 2 subtler ones
- * that only bite on an edge case. Each assertion carries a message describing the intent.
+ * There are 6 planted bugs. None of them announce themselves with a crash or an obviously
+ * absurd value — every one is a plausible-looking implementation that quietly disagrees with
+ * the Javadoc. The library distinguishes two counts: copiesTotal (how many the library OWNS)
+ * and copiesAvailable (how many are ON THE SHELF right now). Several bugs hinge on that
+ * distinction. Read the Javadoc, then the code, and find the mismatch. Two waves:
+ *
+ *   - Wave 1: a careful read of the Javadoc is enough to spot the mismatch.
+ *   - Wave 2: the bug only bites on an edge case (a partially-borrowed book, the last copy,
+ *     or one return too many).
+ *
+ * Each assertion carries a message describing the intent.
  */
 class CatalogTest {
 
     // -----------------------------------------------------------------------
-    // The 4 easier bugs
+    // Wave 1 — read the Javadoc carefully
     // -----------------------------------------------------------------------
 
     @Test
-    void isAvailableTrueWithOneCopy() {
+    void isAvailableReflectsCopiesOnTheShelf() {
+        // is_available is about what's ON THE SHELF (copiesAvailable), not what the library
+        // OWNS (copiesTotal). A book with every copy checked out is NOT available, even
+        // though the library still owns copies.
         Catalog cat = new Catalog();
-        Book book = cat.addBook("Dune", "Herbert", 1);
-        assertTrue(cat.isAvailable(book.getId()),
-                "isAvailable should be true whenever at least ONE copy is on the shelf (1 copy = available)");
+        Book stocked = cat.addBook("Dune", "Herbert", 2);
+        Book out = cat.addBook("Rare Tome", "Anon", 2);
+        out.setCopiesAvailable(0);   // both copies checked out; the library still owns 2
+        assertTrue(cat.isAvailable(stocked.getId()),
+                "isAvailable should be true when at least one copy is on the shelf");
+        assertFalse(cat.isAvailable(out.getId()),
+                "isAvailable should be false when copiesAvailable is 0, even though the library still "
+                        + "OWNS copies (copiesTotal is 2)");
     }
 
     @Test
-    void availableBooksListsInStock() {
-        Catalog cat = new Catalog();
-        cat.addBook("Dune", "Herbert", 2);
-        cat.addBook("Rare Tome", "Anon", 0);
-        List<String> titles = cat.availableBooks().stream()
-                .map(Book::getTitle)
-                .collect(Collectors.toList());
-        assertEquals(List.of("Dune"), titles,
-                "availableBooks() should return books WITH copies ('Dune'), not the out-of-stock ones");
-    }
-
-    @Test
-    void booksByAuthorMatchesAuthor() {
+    void booksByAuthorMatchesExactly() {
+        // books_by_author matches the author EXACTLY, not as a substring. 'Frank Herbertson'
+        // merely contains the letters of 'Herbert' and must not be returned for 'Herbert'.
         Catalog cat = new Catalog();
         cat.addBook("Dune", "Herbert");
-        cat.addBook("Foundation", "Asimov");
+        cat.addBook("Ringworld", "Larry Niven");
+        cat.addBook("A Guide", "Frank Herbertson");   // contains "Herbert" but a different author
         List<String> titles = cat.booksByAuthor("Herbert").stream()
                 .map(Book::getTitle)
+                .sorted()
                 .collect(Collectors.toList());
         assertEquals(List.of("Dune"), titles,
-                "booksByAuthor('Herbert') should return Herbert's books ('Dune'), not everyone else's");
+                "booksByAuthor('Herbert') should match the author EXACTLY (just 'Dune'); "
+                        + "'Frank Herbertson' only contains the substring and must be excluded");
     }
 
     @Test
     void totalCopiesCountsOwned() {
+        // total_copies counts how many copies the library OWNS (copiesTotal), independent of
+        // how many are currently checked out.
         Catalog cat = new Catalog();
         Book a = cat.addBook("Dune", "Herbert", 3);
         cat.addBook("Foundation", "Asimov", 2);
-        cat.checkout(a.getId());  // one copy of Dune is out, but the library still OWNS 3
+        a.setCopiesAvailable(2);   // one copy of Dune is out, but the library still OWNS 3
         assertEquals(5, cat.totalCopies(),
                 "totalCopies() should sum copiesTotal (3 + 2 = 5); checking a copy out doesn't reduce it");
     }
 
     // -----------------------------------------------------------------------
-    // The 2 harder bugs (edge cases)
+    // Wave 2 — edge cases: partial stock, the last copy, one return too many
     // -----------------------------------------------------------------------
+
+    @Test
+    void availableBooksIncludesPartiallyBorrowed() {
+        // available_books returns every book with at least one copy on the shelf — INCLUDING
+        // a book that has some copies out and some available. Only a fully checked-out book
+        // is excluded.
+        Catalog cat = new Catalog();
+        cat.addBook("Dune", "Herbert", 2);                  // 2 of 2 on the shelf
+        Book partial = cat.addBook("Foundation", "Asimov", 2);
+        partial.setCopiesAvailable(1);                      // 1 of 2 on the shelf
+        Book out = cat.addBook("Rare Tome", "Anon", 1);
+        out.setCopiesAvailable(0);                          // 0 of 1 on the shelf
+        List<String> titles = cat.availableBooks().stream()
+                .map(Book::getTitle)
+                .sorted()
+                .collect(Collectors.toList());
+        assertEquals(List.of("Dune", "Foundation"), titles,
+                "availableBooks() should list every book with >= 1 copy on the shelf, including the "
+                        + "partially-borrowed 'Foundation'; only the fully checked-out 'Rare Tome' is excluded");
+    }
 
     @Test
     void checkoutRefusesWhenNoneAvailable() {
@@ -91,7 +123,7 @@ class CatalogTest {
     }
 
     // -----------------------------------------------------------------------
-    // Correct behavior (kept as clean reference points)
+    // Correct behavior (these pass out of the box — clean reference points)
     // -----------------------------------------------------------------------
 
     @Test

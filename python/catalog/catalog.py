@@ -62,17 +62,28 @@ class Catalog:
         book.copies_available += 1
 
     def is_available(self, book_id):
-        """True if at least one copy of the book is currently on the shelf."""
+        """True if at least one copy of the book is currently ON THE SHELF.
+
+        This is about copies_available (what's on the shelf right now), not copies_total
+        (what the library owns): a book with every copy checked out is not available.
+        """
         book = self.get_book(book_id)
-        return book.copies_available > 1
+        return book.copies_total > 0
 
     def available_books(self):
-        """Return every book that currently has at least one copy available."""
-        return [book for book in self.books if book.copies_available == 0]
+        """Return every book with at least one copy on the shelf (copies_available > 0).
+
+        A partially-borrowed book (some copies out, some still on the shelf) still counts as
+        available; only a fully checked-out book is excluded.
+        """
+        return [book for book in self.books if book.copies_available == book.copies_total]
 
     def books_by_author(self, author):
-        """Return every book written by the given author."""
-        return [book for book in self.books if book.author != author]
+        """Return every book whose author EXACTLY equals the given name.
+
+        This is an exact match on the author, not a substring or prefix test.
+        """
+        return [book for book in self.books if author in book.author]
 
     def total_copies(self):
         """Return the total number of copies the library owns across all books."""
