@@ -7,7 +7,7 @@ comfortable in.
 
 The interview is really **one main task with an optional bonus**:
 
-1. **Debugging (the whole interview)** — The library ships with a failing test suite. Six
+1. **Debugging (the whole interview)** — The library ships with a failing test suite. Eight
    bugs have been planted. Find and fix them until the tests are green. None of them are
    one-liners that scream at you — they're the kind of plausible-looking code that quietly
    does the wrong thing, so take your time and reason carefully.
@@ -26,8 +26,8 @@ hypotheses, verify them, and communicate as you go. **Think out loud.**
 A tiny in-memory library catalog. Each book records how many copies the library owns
 (`copies_total`) and how many are on the shelf right now (`copies_available`). The
 `Catalog` class lets you add books, look them up, check copies out and back in, ask
-whether a title is available, list what's in stock, filter by author, and total the
-collection.
+whether a title is available, list what's in stock, filter by author, total the collection,
+weed thinly-stocked titles, and restock existing ones.
 
 The two implementations behave identically — same classes, same methods, same bugs.
 
@@ -73,17 +73,19 @@ mvn test                            # compiles and runs the tests
    states what it should do — and fix the bugs.
 4. Re-run until everything is green.
 
-There are **six** planted bugs, and **none of them are loud** — there are no crashes or
+There are **eight** planted bugs, and **none of them are loud** — there are no crashes or
 wildly-wrong values to point the way. Each is a plausible implementation that quietly
 disagrees with the method's docstring. A recurring theme: this library tracks two numbers,
 `copies_total` (how many the library **owns**) and `copies_available` (how many are **on the
-shelf** right now), and several bugs quietly confuse the two. The **docstring on each method
-states what it is supposed to do** — the bug is always a mismatch between that description
+shelf** right now), and several bugs quietly confuse the two. Others are subtler still — a
+loop that mutates the shelf list while it walks it. The **docstring on each method states
+what it is supposed to do** — the bug is (almost) always a mismatch between that description
 and the code.
 
 The tests come in two waves: *Wave 1* is catchable from a careful read of the docstring;
-*Wave 2* only bites on an edge case (a partially-borrowed book, the last copy, or one return
-too many). Fix the source, **not** the tests.
+*Wave 2* only bites on an edge case (a partially-borrowed book, the last copy, one return
+too many, an adjacent pair dropped while weeding, or restocked copies that never reach the
+shelf). Fix the source, **not** the tests.
 
 **As you work, tell us:** what does the failing test expect, what did you observe, what's
 your hypothesis, and how did the fix confirm it?

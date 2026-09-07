@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
  * Behavioral tests for BookNook. These describe the *intended* behavior.
  * Fix the source in Catalog.java until they all pass — do not change the tests.
  *
- * There are 6 planted bugs. None of them announce themselves with a crash or an obviously
+ * There are 8 planted bugs. None of them announce themselves with a crash or an obviously
  * absurd value — every one is a plausible-looking implementation that quietly disagrees with
  * the Javadoc. The library distinguishes two counts: copiesTotal (how many the library OWNS)
  * and copiesAvailable (how many are ON THE SHELF right now). Several bugs hinge on that
@@ -21,7 +21,8 @@ import org.junit.jupiter.api.Test;
  *
  *   - Wave 1: a careful read of the Javadoc is enough to spot the mismatch.
  *   - Wave 2: the bug only bites on an edge case (a partially-borrowed book, the last copy,
- *     or one return too many).
+ *     one return too many, an adjacent pair dropped while weeding, or restocked copies that
+ *     never reach the shelf).
  *
  * Each assertion carries a message describing the intent.
  */
@@ -120,6 +121,40 @@ class CatalogTest {
         cat.returnBook(book.getId());   // already full: must stay at 1, not climb to 2
         assertEquals(1, cat.getBook(book.getId()).getCopiesAvailable(),
                 "copiesAvailable must never exceed copiesTotal (1); an extra return should be a no-op");
+    }
+
+    @Test
+    void weedRemovesEveryThinlyStockedTitle() {
+        // weed pulls EVERY title stocked under the cutoff. NOTE: the order these are added
+        // in is load-bearing — keep the two thin titles adjacent.
+        Catalog cat = new Catalog();
+        cat.addBook("Pamphlet A", "Anon", 1);   // under 2
+        cat.addBook("Pamphlet B", "Anon", 1);   // under 2, right after A
+        cat.addBook("Encyclopedia", "Britannica", 5);
+        cat.weed(2);
+        List<String> titles = cat.getBooks().stream()
+                .map(Book::getTitle)
+                .sorted()
+                .collect(Collectors.toList());
+        assertEquals(List.of("Encyclopedia"), titles,
+                "weed(2) should remove EVERY title owned in fewer than 2 copies (both pamphlets), "
+                        + "leaving only the Encyclopedia");
+    }
+
+    @Test
+    void restockPutsNewCopiesOnTheShelf() {
+        // Restocking acquires copies that are ready to borrow: it must raise BOTH what the
+        // library owns and what's on the shelf. A restock that only bumps the owned count
+        // leaves the new copies permanently off the shelf.
+        Catalog cat = new Catalog();
+        Book book = cat.addBook("Dune", "Herbert", 1);
+        cat.checkout(book.getId());     // available 1 -> 0, still owns 1
+        cat.restock(book.getId(), 2);   // acquire 2 more: owns 3, and 2 should now be on the shelf
+        assertEquals(3, cat.getBook(book.getId()).getCopiesTotal(),
+                "restock should raise copiesTotal (1 + 2 = 3)");
+        assertEquals(2, cat.getBook(book.getId()).getCopiesAvailable(),
+                "restock should also put the new copies on the shelf (0 + 2 = 2); bumping only the "
+                        + "owned count leaves the shelf empty");
     }
 
     // -----------------------------------------------------------------------
