@@ -15,6 +15,10 @@ public class Catalog {
     private final List<Book> books = new ArrayList<>();
     private int nextId = 1;
 
+    public List<Book> getBooks() {
+        return books;
+    }
+
     /** Add a book to the catalog and return it. It starts with all copies available. */
     public Book addBook(String title, String author, int copies) {
         Book book = new Book(nextId, title, author, copies);
@@ -102,5 +106,28 @@ public class Catalog {
             sum += book.getCopiesAvailable();
         }
         return sum;
+    }
+
+    /**
+     * Weed (remove) every title the library owns fewer than {@code minCopies} copies of. A
+     * title the library owns exactly {@code minCopies} of (or more) is kept — only the
+     * thinly-stocked ones are pulled from the catalog.
+     */
+    public void weed(int minCopies) {
+        for (int i = 0; i < books.size(); i++) {
+            if (books.get(i).getCopiesTotal() < minCopies) {
+                books.remove(i);
+            }
+        }
+    }
+
+    /**
+     * The library acquires {@code n} more copies of a book: raise BOTH the number the
+     * library owns (copiesTotal) and the number on the shelf (copiesAvailable) by {@code n}
+     * — the new copies arrive ready to borrow.
+     */
+    public void restock(int bookId, int n) {
+        Book book = getBook(bookId);
+        book.setCopiesTotal(book.getCopiesTotal() + n);
     }
 }

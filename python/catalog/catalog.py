@@ -88,3 +88,22 @@ class Catalog:
     def total_copies(self):
         """Return the total number of copies the library owns across all books."""
         return sum(book.copies_available for book in self.books)
+
+    def weed(self, min_copies):
+        """Weed (remove) every title the library owns fewer than `min_copies` copies of.
+
+        A title the library owns exactly `min_copies` of (or more) is kept — only the
+        thinly-stocked ones are pulled from the catalog.
+        """
+        for book in self.books:
+            if book.copies_total < min_copies:
+                self.books.remove(book)
+
+    def restock(self, book_id, n):
+        """The library acquires `n` more copies of a book.
+
+        Raise BOTH the number the library owns (copies_total) and the number on the shelf
+        (copies_available) by `n` — the new copies arrive ready to borrow.
+        """
+        book = self.get_book(book_id)
+        book.copies_total += n

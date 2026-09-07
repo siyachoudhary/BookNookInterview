@@ -3,7 +3,7 @@
 These describe the *intended* behavior. Fix the source in catalog/catalog.py until they
 all pass — do not change the tests.
 
-There are 6 planted bugs. None of them announce themselves with a crash or an obviously
+There are 8 planted bugs. None of them announce themselves with a crash or an obviously
 absurd value — every one is a plausible-looking implementation that quietly disagrees with
 the docstring. The library distinguishes two counts: `copies_total` (how many the library
 OWNS) and `copies_available` (how many are ON THE SHELF right now). Several bugs hinge on
@@ -11,7 +11,8 @@ that distinction. Read the docstring, then the code, and find the mismatch. Two 
 
   * Wave 1 — a careful read of the docstring is enough to spot the mismatch.
   * Wave 2 — the bug only bites on an edge case (a partially-borrowed book, the last copy,
-    or one return too many).
+    one return too many, an adjacent pair dropped while weeding the shelves, or restocked
+    copies that never reach the shelf).
 
 Each assertion carries a message describing the intended behavior.
 """
@@ -116,6 +117,36 @@ def test_return_does_not_exceed_owned_copies():
     assert cat.get_book(book.id).copies_available == 1, (
         "copies_available must never exceed copies_total (1); a second return with nothing "
         "checked out should be a no-op"
+    )
+
+
+def test_weed_removes_every_thinly_stocked_title():
+    # weed pulls EVERY title stocked under the cutoff, however many there are. NOTE: the
+    # order these are added in is load-bearing — keep the two thin titles adjacent.
+    cat = Catalog()
+    cat.add_book("Pamphlet A", "Anon", copies=1)   # under 2
+    cat.add_book("Pamphlet B", "Anon", copies=1)   # under 2, right after A
+    cat.add_book("Encyclopedia", "Britannica", copies=5)
+    cat.weed(2)
+    titles = sorted(b.title for b in cat.books)
+    assert titles == ["Encyclopedia"], (
+        "weed(2) should remove EVERY title owned in fewer than 2 copies (both pamphlets), "
+        f"leaving only the Encyclopedia; got {titles}"
+    )
+
+
+def test_restock_puts_new_copies_on_the_shelf():
+    # Restocking acquires copies that are ready to borrow: it must raise BOTH what the
+    # library owns and what's on the shelf. A restock that only bumps the owned count leaves
+    # the new copies permanently off the shelf.
+    cat = Catalog()
+    book = cat.add_book("Dune", "Herbert", copies=1)
+    cat.checkout(book.id)          # available 1 -> 0, still owns 1
+    cat.restock(book.id, 2)        # acquire 2 more: owns 3, and 2 should now be on the shelf
+    assert cat.get_book(book.id).copies_total == 3, "restock should raise copies_total (1 + 2 = 3)"
+    assert cat.get_book(book.id).copies_available == 2, (
+        "restock should also put the new copies on the shelf (0 + 2 = 2); bumping only the "
+        "owned count leaves the shelf empty"
     )
 
 

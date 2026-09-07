@@ -5,7 +5,7 @@ public class Book {
     private final int id;
     private final String title;
     private final String author;
-    private final int copiesTotal;
+    private int copiesTotal;
     private int copiesAvailable;
 
     public Book(int id, String title, String author, int copies) {
@@ -30,6 +30,10 @@ public class Book {
 
     public int getCopiesTotal() {
         return copiesTotal;
+    }
+
+    public void setCopiesTotal(int copiesTotal) {
+        this.copiesTotal = copiesTotal;
     }
 
     public int getCopiesAvailable() {
